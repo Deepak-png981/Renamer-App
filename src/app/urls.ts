@@ -1,0 +1,1 @@
+export const GIHHUB_RELEASES_URL = 'https://api.github.com/repos/Deepak-png981/Renamer/releases/latest';
