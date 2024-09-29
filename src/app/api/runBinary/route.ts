@@ -104,11 +104,13 @@ export async function POST(req: NextRequest) {
         paths.tempFilePath = path.join(paths.tempDir, fileName);
         fs.writeFileSync(paths.tempFilePath, fileContent, 'utf8');
 
+        console.log('outputJsonFile:', paths.outputJsonFile);
+        
         const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile];
         if (debug) {
             args.push('--debug');
         }
-
+        
         const { stdout, stderr } = await execFilePromise(BINARY_LOCAL_PATH, args, {
             env: {
                 ...process.env,
