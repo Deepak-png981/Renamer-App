@@ -109,13 +109,13 @@ export async function POST(req: NextRequest) {
             args.push('--debug');
         }
 
-        const { stderr } = await execFilePromise(BINARY_LOCAL_PATH, args, {
+        const { stdout, stderr } = await execFilePromise(BINARY_LOCAL_PATH, args, {
             env: {
                 ...process.env,
                 OPENAI_API_KEY: process.env.OPENAI_API_KEY,
             },
         });
-
+        console.log('stdout:', stdout);
         if (stderr) {
             console.error('Binary error:', stderr);
         }
