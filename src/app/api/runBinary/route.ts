@@ -12,8 +12,8 @@ dotenv.config();
 
 const execFilePromise = promisify(execFile);
 
-const BINARY_LOCAL_PATH = path.join(process.cwd(), 'binaries', 'renamer-win.exe');
 const BINARY_FOLDER_PATH = '/tmp/binaries'
+const BINARY_LOCAL_PATH = path.join(BINARY_FOLDER_PATH, 'renamer-linux');
 
 async function getLatestReleaseInfo() {
     const response = await fetch(GIHHUB_RELEASES_URL);
@@ -23,9 +23,9 @@ async function getLatestReleaseInfo() {
 
     const releaseData: GitHubRelease = await response.json() as GitHubRelease;
     const latestVersion = releaseData.tag_name.replace('v', '');  
-    const asset = releaseData.assets.find(asset => asset.name === 'renamer-win.exe');
+    const asset = releaseData.assets.find(asset => asset.name.toLowerCase().includes('linux'));
     if (!asset) {
-        throw new Error('Could not find renamer-win.exe in the release assets.');
+        throw new Error('Could not find renamer-linux in the release assets.');
     }
 
     const downloadUrl = asset.browser_download_url;
