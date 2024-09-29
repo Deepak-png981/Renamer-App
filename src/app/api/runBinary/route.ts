@@ -60,6 +60,9 @@ async function downloadBinary(url : string) {
     });
 
     console.log('Binary downloaded successfully.');
+    // 755 = owner can read/write/execute, others can read/execute
+    await fs.promises.chmod(BINARY_LOCAL_PATH, '755');  
+    console.log('Binary permissions set to executable.');
 }
 
 function saveLocalBinaryVersion(version: string) {
