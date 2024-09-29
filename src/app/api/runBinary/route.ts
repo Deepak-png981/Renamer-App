@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     const paths = {
         tempDir: '',
         tempFilePath: '',
-        outputJsonFile: 'output.json'
+        outputJsonFile:  path.join('/tmp', 'output.json'),
     };
 
     try {
