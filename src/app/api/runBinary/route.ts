@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         paths.tempFilePath = path.join(paths.tempDir, fileName);
         writeFile(paths.tempFilePath, fileContent);
 
-        const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile , '-nc', namingConvention];
+        const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile , '--namingConvention', namingConvention];
         if (debug) {
             args.push('--debug');
         }
