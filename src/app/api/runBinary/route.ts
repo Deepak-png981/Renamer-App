@@ -1,116 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
-import fetch from 'node-fetch';
-import semver from 'semver';  
 import dotenv from 'dotenv';
-import { GitHubRelease } from '@/app/types';
-import { GIHHUB_RELEASES_URL } from '@/app/urls';
+import path from 'path';
+import { getLatestReleaseInfo, getLocalBinaryVersion, downloadBinary, saveLocalBinaryVersion } from './binaryManager';
+import { createTempDir, writeFile, readFile, removeFile, removeDir, fileExists } from './fileOperations';
+import semver from 'semver';
+import { isRateLimited } from './rateLimit';
 dotenv.config();
 
+
 const execFilePromise = promisify(execFile);
-
-const BINARY_FOLDER_PATH = '/tmp/binaries'
-const BINARY_LOCAL_PATH = path.join(BINARY_FOLDER_PATH, 'renamer-linux');
-
-async function getLatestReleaseInfo() {
-    const response = await fetch(GIHHUB_RELEASES_URL);
-    if (!response.ok) {
-        throw new Error('Failed to fetch release info from GitHub.');
-    }
-
-    const releaseData: GitHubRelease = await response.json() as GitHubRelease;
-    const latestVersion = releaseData.tag_name.replace('v', '');  
-    const asset = releaseData.assets.find(asset => asset.name.toLowerCase().includes('linux'));
-    if (!asset) {
-        throw new Error('Could not find renamer-linux in the release assets.');
-    }
-
-    const downloadUrl = asset.browser_download_url;
-    return { latestVersion, downloadUrl };
-}
-
-function getLocalBinaryVersion() {
-    const versionFilePath = path.join('/tmp/binaries', 'version.txt');
-    if (fs.existsSync(versionFilePath)) {
-        return fs.readFileSync(versionFilePath, 'utf8').trim();
-    }
-    return null; 
-}
-
-async function downloadBinary(url : string) {
-    if (!fs.existsSync(BINARY_FOLDER_PATH)) {
-        fs.mkdirSync(BINARY_FOLDER_PATH, { recursive: true }); 
-    }
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error('Failed to download binary.');
-    }
-    const responseBody = response.body;
-    if (!responseBody) {
-        throw new Error('Response body is null.');
-    }
-    const fileStream = fs.createWriteStream(BINARY_LOCAL_PATH);
-    await new Promise((resolve, reject) => {
-        responseBody.pipe(fileStream);
-        responseBody.on('error', reject);
-        fileStream.on('finish', resolve);
-    });
-
-    console.log('Binary downloaded successfully.');
-    // 755 = owner can read/write/execute, others can read/execute
-    await fs.promises.chmod(BINARY_LOCAL_PATH, '755');  
-    console.log('Binary permissions set to executable.');
-}
-
-function saveLocalBinaryVersion(version: string) {
-    const versionFilePath = path.join('/tmp/binaries', 'version.txt');
-    fs.writeFileSync(versionFilePath, version);
-}
+const BINARY_LOCAL_PATH = path.join('/tmp/binaries', 'renamer-linux');
 
 export async function POST(req: NextRequest) {
+    const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown';
+
+    if (isRateLimited(ip)) {
+        return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    }
+
     const paths = {
         tempDir: '',
         tempFilePath: '',
-        outputJsonFile:  path.join('/tmp', 'output.json'),
+        outputJsonFile: path.join('/tmp', 'output.json'),
     };
 
     try {
-        const { fileName, fileContent, debug } = await req.json();
+        const { fileName, fileContent, debug, namingConvention = 'camelCase' } = await req.json();
 
         if (!fileName || !fileContent) {
-            return NextResponse.json({ error: 'fileName and fileContent are required.' }, { status: 400 }); 
+            return NextResponse.json({ error: 'fileName and fileContent are required.' }, { status: 400 });
         }
 
         const { latestVersion, downloadUrl } = await getLatestReleaseInfo();
-
         const localVersion = getLocalBinaryVersion();
 
         if (!localVersion || semver.lt(localVersion, latestVersion)) {
             console.log(`Downloading latest binary (version ${latestVersion})...`);
+            console.log('Time before downloading the binary:', Date.now());
             await downloadBinary(downloadUrl);
+            console.log('Time after downloading the binary:', Date.now());
             saveLocalBinaryVersion(latestVersion);
         } else {
             console.log(`Local binary is up-to-date (version ${localVersion}).`);
         }
 
-        paths.tempDir = '/tmp/temp';
-        if (!fs.existsSync(paths.tempDir)) {
-            fs.mkdirSync(paths.tempDir);
-        }
-
+        paths.tempDir = createTempDir('/tmp');
         paths.tempFilePath = path.join(paths.tempDir, fileName);
-        fs.writeFileSync(paths.tempFilePath, fileContent, 'utf8');
+        writeFile(paths.tempFilePath, fileContent);
 
-        console.log('outputJsonFile:', paths.outputJsonFile);
-        
-        const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile];
+        const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile , '-nc', namingConvention];
         if (debug) {
             args.push('--debug');
         }
-        
+
         const { stdout, stderr } = await execFilePromise(BINARY_LOCAL_PATH, args, {
             env: {
                 ...process.env,
@@ -122,11 +66,11 @@ export async function POST(req: NextRequest) {
             console.error('Binary error:', stderr);
         }
 
-        if (!fs.existsSync(paths.outputJsonFile)) {
+        if (!fileExists(paths.outputJsonFile)) {
             return NextResponse.json({ error: 'Output JSON file was not generated by the binary.' }, { status: 500 });
         }
 
-        const jsonData = fs.readFileSync(paths.outputJsonFile, 'utf8');
+        const jsonData = readFile(paths.outputJsonFile);
         const renamedFiles = JSON.parse(jsonData);
 
         return NextResponse.json({ renamedFiles });
@@ -136,17 +80,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to process the file.' }, { status: 500 });
     } finally {
         try {
-            if (fs.existsSync(paths.outputJsonFile)) {
-                fs.unlinkSync(paths.outputJsonFile);
-            }
-
-            if (paths.tempFilePath && fs.existsSync(paths.tempFilePath)) {
-                fs.unlinkSync(paths.tempFilePath);
-            }
-
-            if (paths.tempDir && fs.existsSync(paths.tempDir)) {
-                fs.rmdirSync(paths.tempDir, { recursive: true });
-            }
+            removeFile(paths.outputJsonFile);
+            removeFile(paths.tempFilePath);
+            removeDir(paths.tempDir);
         } catch (cleanupError) {
             console.error('Error during cleanup:', cleanupError);
         }
