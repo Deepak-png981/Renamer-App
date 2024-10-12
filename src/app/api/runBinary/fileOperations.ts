@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-
-export function createTempDir(basePath: string) {
+import os from 'os';
+export function createTempDir(basePath: string = os.tmpdir()) {
     const tempDir = path.join(basePath, 'temp');
     if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir);
+        fs.mkdirSync(tempDir , { recursive: true });
     }
     return tempDir;
 }

@@ -7,6 +7,7 @@ import { getLatestReleaseInfo, getLocalBinaryVersion, downloadBinary, saveLocalB
 import { createTempDir, writeFile, readFile, removeFile, removeDir, fileExists } from './fileOperations';
 import semver from 'semver';
 import { isRateLimited } from './rateLimit';
+import { contentDirectoryFile } from '@/app/types';
 dotenv.config();
 
 
@@ -27,10 +28,10 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-        const { fileName, fileContent, debug, namingConvention = 'camelCase' } = await req.json();
+        const { fileName, fileContent,contentDirectory, debug, namingConvention = 'camelCase' } = await req.json();
 
-        if (!fileName || !fileContent) {
-            return NextResponse.json({ error: 'fileName and fileContent are required.' }, { status: 400 });
+        if (!fileName && !contentDirectory) {
+            return NextResponse.json({ error: 'fileName or contentDirectory is required.' }, { status: 400 });
         }
 
         const { latestVersion, downloadUrl } = await getLatestReleaseInfo();
@@ -46,10 +47,22 @@ export async function POST(req: NextRequest) {
             console.log(`Local binary is up-to-date (version ${localVersion}).`);
         }
 
-        paths.tempDir = createTempDir('/tmp');
-        paths.tempFilePath = path.join(paths.tempDir, fileName);
-        writeFile(paths.tempFilePath, fileContent);
+        if (contentDirectory && contentDirectory.files && Array.isArray(contentDirectory.files)) {
+            paths.tempDir = createTempDir('/tmp/contentDir');
+            contentDirectory.files.forEach((file : contentDirectoryFile) => {
+                const tempFilePath = path.join(paths.tempDir, file.fileName);
+                writeFile(tempFilePath, file.content); 
+            });
 
+            paths.tempFilePath = paths.tempDir; 
+        } else if (fileName && fileContent) {
+            paths.tempDir = createTempDir('/tmp');
+            paths.tempFilePath = path.join(paths.tempDir, fileName);
+            writeFile(paths.tempFilePath, fileContent);
+        } else {
+            return NextResponse.json({ error: 'Invalid input: either fileName/fileContent or contentDirectory is required.' }, { status: 400 });
+        }
+        
         const args = ['--path', paths.tempFilePath, '-o', paths.outputJsonFile , '--namingConvention', namingConvention];
         if (debug) {
             args.push('--debug');
