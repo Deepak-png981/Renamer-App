@@ -7,3 +7,7 @@ export interface GitHubRelease {
     tag_name: string;
     assets: GitHubAsset[];
 }
+export interface contentDirectoryFile {
+    fileName: string;
+    content: string;
+}
