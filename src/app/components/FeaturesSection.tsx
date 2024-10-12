@@ -1,4 +1,4 @@
-import { FeatureBundle, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Code, Settings, Check } from 'lucide-react'
 import { FeaturesSectionProps } from './types/components'
 
