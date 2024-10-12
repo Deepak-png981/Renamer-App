@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
 import { FileText, CheckCircle, ClipboardList, Zap } from 'lucide-react'
+import { FeaturesSectionProps } from './types/components'
 
-export default function HowItWorksSection({ controls, fadeInUp }: any) {
+export default function HowItWorksSection({ controls, fadeInUp }: FeaturesSectionProps) {
   return (
     <section id="how-it-works" className="py-20 px-8 bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="max-w-4xl mx-auto">

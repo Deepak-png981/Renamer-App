@@ -1,7 +1,8 @@
-import { motion } from 'framer-motion'
+import { FeatureBundle, motion } from 'framer-motion'
 import { Code, Settings, Check } from 'lucide-react'
+import { FeaturesSectionProps } from './types/components'
 
-export default function FeaturesSection({ controls, fadeInUp }: any) {
+export default function FeaturesSection({ controls, fadeInUp }: FeaturesSectionProps) {
   return (
     <section id="features" className="py-20 px-8 bg-white">
       <div className="max-w-6xl mx-auto">
