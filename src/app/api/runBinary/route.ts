@@ -8,6 +8,7 @@ import { createTempDir, writeFile, readFile, removeFile, removeDir, fileExists }
 import semver from 'semver';
 import { isRateLimited } from './rateLimit';
 import { contentDirectoryFile } from '@/app/types';
+import fs from 'fs';
 dotenv.config();
 
 
@@ -90,12 +91,16 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error('Error processing file:', error);
-        return NextResponse.json({ error: 'Failed to process the file.' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to process the file.'  }, { status: 500 }); 
     } finally {
         try {
             removeFile(paths.outputJsonFile);
-            removeFile(paths.tempFilePath);
-            removeDir(paths.tempDir);
+            if (fileExists(paths.tempFilePath) && !fs.lstatSync(paths.tempFilePath).isDirectory()) {
+                removeFile(paths.tempFilePath);
+            }
+            if (fileExists(paths.tempDir)) {
+                removeDir(paths.tempDir);
+            }
         } catch (cleanupError) {
             console.error('Error during cleanup:', cleanupError);
         }
