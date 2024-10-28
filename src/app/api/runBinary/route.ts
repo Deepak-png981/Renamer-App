@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error('Error processing file:', error);
-        return NextResponse.json({ error: 'Failed to process the file.' }, { status: 500 });
+        return NextResponse.json({ error: `Failed to process the file. ${error}`  }, { status: 500 }); 
     } finally {
         try {
             removeFile(paths.outputJsonFile);
